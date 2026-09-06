@@ -13,7 +13,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 
-public class TransactionRequest {
+public class TransferRequest {
 
     @NotBlank(message = "Sender account number is required")
     private String senderAccountNumber;
@@ -24,6 +24,6 @@ public class TransactionRequest {
     @NotNull(message = "Amount is required")
     @Positive(message = "Amount must be positive")
     private BigDecimal amount;
-    
+
     private String description;
 }
