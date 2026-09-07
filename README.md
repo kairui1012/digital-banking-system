@@ -2,12 +2,12 @@
 
 A Java and Spring Boot-based digital banking backend built with a microservices architecture. The system is designed to support account management, bank transfers, transaction history, fraud detection, payment processing, and notifications, with Kafka enabling event-driven communication between services.
 
-> This project is currently under development and is approximately **50% complete**.
+> This project is currently under development and is approximately **35% complete**. This estimate is based on implemented business logic, service integration, build status, testing, and deployment readiness.
 
 ## Development Progress
 
 ```text
-██████████░░░░░░░░░░ 50%
+███████░░░░░░░░░░░░░ 35%
 ```
 
 | Module | Current Status |
@@ -16,7 +16,7 @@ A Java and Spring Boot-based digital banking backend built with a microservices 
 | Transaction Service | In progress: includes transfers, transaction lookup, transaction history, and the foundation of Saga event handling |
 | Fraud Detection Service | In progress: transaction risk checks and Kafka fraud events are being implemented |
 | Payment Service | Planned: the basic Spring Boot service structure has been created |
-| Notification Service | Planned: the basic Kafka and email notification dependencies have been configured |
+| Notification Service | In progress: an OTP Kafka consumer has been started, but notification delivery is not implemented yet |
 | API Gateway | Planned: the basic Spring Cloud Gateway structure has been created |
 
 ## Technology Stack
@@ -54,6 +54,28 @@ digital-banking-system/
 - MySQL data persistence configuration
 - Docker Compose development environment for Redis, Kafka, Zookeeper, and MySQL
 
+## How Kafka Is Used
+
+Apache Kafka is used as the event broker between the microservices. It allows each service to react to transaction events asynchronously without being tightly coupled to the other services. Kafka also supports the event-driven Saga flow used to coordinate transfers, fraud checks, account updates, and notifications.
+
+The current transaction flow is:
+
+1. **Transaction Service** creates a transfer with the `PROCESSING` status and publishes a `transaction.initiated` event.
+2. **Fraud Detection Service** consumes `transaction.initiated`, checks the transaction, and publishes either `verification.required` or `fraud.check.clean`.
+3. **Transaction Service** consumes `verification.required`, generates an OTP, stores it temporarily in Redis, and changes the transaction status to `PENDING_VERIFICATION`.
+4. **Account Service** is prepared to consume `transaction.completed` to credit the receiver's account.
+5. **Account Service** also consumes `fraud.detected` to block an account flagged for fraudulent activity.
+
+| Kafka Topic | Producer | Consumer | Purpose |
+| --- | --- | --- | --- |
+| `transaction.initiated` | Transaction Service | Fraud Detection Service | Starts the fraud-checking process for a new transfer |
+| `verification.required` | Fraud Detection Service | Transaction Service | Requests OTP verification for a suspicious transfer |
+| `transaction.otp.generated` | Transaction Service (in progress) | Notification Service | Delivers generated OTP event data to the notification workflow |
+| `fraud.check.clean` | Fraud Detection Service | Transaction Service (in progress) | Reports that a transfer passed the fraud checks |
+| `transaction.completed` | Transaction Service (in progress) | Account Service | Credits the receiver after a successful transfer |
+| `fraud.detected` | Fraud workflow (in progress) | Account Service | Blocks an account associated with confirmed fraud |
+| `transaction.refunded` | Transaction Service (planned) | Relevant services (planned) | Supports compensation when a transfer fails |
+
 ## Roadmap
 
 - Complete the fraud detection rules and suspicious transaction verification flow
@@ -80,4 +102,3 @@ Each microservice can be started from its own directory with the Maven Wrapper:
 ```
 
 Before starting the services, verify the MySQL, Kafka, and Redis connection settings for your local environment.
-

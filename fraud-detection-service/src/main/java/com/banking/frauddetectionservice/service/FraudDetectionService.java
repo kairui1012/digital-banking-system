@@ -33,6 +33,9 @@ public class FraudDetectionService {
     @Value("{fraud.suspicious-amount-multiplier}")
     private double suspiciousAmountMultiplier;
 
+    @Value("{fraud.max-balance-percentage}")
+    private double maxBalancePercentage;
+
     private static final String VERIFICATION_REQUIRED_TOPIC = "verification.required";
     private static final String FRAUD_CHECK_CLEAN_RESULT_TOPIC = "fraud.check.clean";
 
@@ -101,7 +104,7 @@ public class FraudDetectionService {
 
 
     private boolean isVelocityExceeded(String accountNumber){
-        String key = "fraud:velocity" + accountNumber;
+        String key = "fraud:velocity:" + accountNumber;
         Long count = redisTemplate.opsForValue().increment(key);
 
         if(count != null && count == 1){
@@ -113,7 +116,7 @@ public class FraudDetectionService {
     }
 
     private boolean isAmountSuspicious(String accountNumber,BigDecimal amount){
-        String avgKey = "fraud:avg_amount" + accountNumber;
+        String avgKey = "fraud:avg_amount:" + accountNumber;
         String avgStr = redisTemplate.opsForValue().get(avgKey);
         if (avgStr == null){
             redisTemplate.opsForValue().set(avgKey,amount.toString());
@@ -130,10 +133,15 @@ public class FraudDetectionService {
         redisTemplate.opsForValue().set(avgKey,newAvg.toString());
 
         log.info("Amount check - check: {} threshold: {} suspicious: {}",amount,threshold,amount.compareTo(threshold) > 0);
+
+        return amount.compareTo(threshold) > 0;
     }
 
     private boolean isBalanceCheckFailed(BigDecimal senderBalance,BigDecimal amount){
+        BigDecimal maxAllowed = senderBalance.multiply(BigDecimal.valueOf(maxBalancePercentage));
 
+        log.info("Balance check - amount: {} maxAllowed: {} suspicious: {}",amount,maxAllowed,amount.compareTo(maxAllowed) > 0);
+        return amount.compareTo(maxAllowed) > 0;
     }
 }
 

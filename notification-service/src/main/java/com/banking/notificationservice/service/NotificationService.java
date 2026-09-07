@@ -1,0 +1,43 @@
+package com.banking.notificationservice.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.stereotype.Service;
+
+import java.util.Map;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class NotificationService {
+    @KafkaListener(topics = "transaction.otp.generated")
+    public void consumeOTPGenerated(
+            @Payload Map<String,Object> payload
+            )
+    {
+        try {
+            String accountNumber = (String) payload.get("accountNumber");
+            String otp = (String) payload.get("otp");
+            String transactionId = (String) payload.get("transactionId");
+            String amount = (String) payload.get("amount");
+            String reason = (String) payload.get("reason");
+
+            sendAlart(
+                    "TRANSACTION VERIFICATION REQUIRED",
+                        String.format("Suspicious activity detected on your account"
+                            +"Reason: %s"
+                            +"A transaction of %s is pending verification."
+                            +"Your OTP is: %s. Valid for 5 minutes"
+                            +"If this wasn't you - ignore this message."
+                    )
+            )
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+    private void sendAlart(String accountNumber,String subject,String message){
+
+    }
+}
