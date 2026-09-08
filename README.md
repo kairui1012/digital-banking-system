@@ -2,12 +2,12 @@
 
 A Java and Spring Boot-based digital banking backend built with a microservices architecture. The system is designed to support account management, bank transfers, transaction history, fraud detection, payment processing, and notifications, with Kafka enabling event-driven communication between services.
 
-> This project is currently under development and is approximately **35% complete**. This estimate is based on implemented business logic, service integration, build status, testing, and deployment readiness.
+> This project is currently under development and is approximately **55% complete**. This estimate is based on implemented business logic, service integration, build status, testing, and deployment readiness.
 
 ## Development Progress
 
 ```text
-███████░░░░░░░░░░░░░ 35%
+███████████░░░░░░░░░ 55%
 ```
 
 | Module | Current Status |
@@ -15,7 +15,7 @@ A Java and Spring Boot-based digital banking backend built with a microservices 
 | Account Service | In progress: includes account creation, account lookup, balance deduction, crediting, and account blocking endpoints |
 | Transaction Service | In progress: includes transfers, transaction lookup, transaction history, and the foundation of Saga event handling |
 | Fraud Detection Service | In progress: transaction risk checks and Kafka fraud events are being implemented |
-| Payment Service | Planned: the basic Spring Boot service structure has been created |
+| Payment Service | In progress: payment request, response, entity, and status models have been created |
 | Notification Service | In progress: an OTP Kafka consumer has been started, but notification delivery is not implemented yet |
 | API Gateway | Planned: the basic Spring Cloud Gateway structure has been created |
 

@@ -24,7 +24,7 @@ public class NotificationService {
             String amount = (String) payload.get("amount");
             String reason = (String) payload.get("reason");
 
-            sendAlart(
+            sendAlart(accountNumber,
                     "TRANSACTION VERIFICATION REQUIRED",
                         String.format("Suspicious activity detected on your account"
                             +"Reason: %s"
@@ -32,7 +32,7 @@ public class NotificationService {
                             +"Your OTP is: %s. Valid for 5 minutes"
                             +"If this wasn't you - ignore this message."
                     )
-            )
+            );
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
