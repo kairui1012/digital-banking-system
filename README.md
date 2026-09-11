@@ -1,34 +1,112 @@
 # Digital Banking System
 
-A Java and Spring Boot-based digital banking backend built with a microservices architecture. The system is designed to support account management, bank transfers, transaction history, fraud detection, payment processing, and notifications, with Kafka enabling event-driven communication between services.
+Digital Banking System is a Java 17 and Spring Boot microservices backend for account management, bank transfers, fraud screening, payment processing, and event-driven notifications. It combines synchronous REST communication with Apache Kafka events and uses a Saga-style workflow to coordinate transfers across independently deployable services.
 
-> This project is currently under development and is approximately **55% complete**. This estimate is based on implemented business logic, service integration, build status, testing, and deployment readiness.
+> **Project status:** Under active development — approximately **65% complete**. Core account and transfer flows are implemented, while payment hardening, notification delivery, security, automated testing, and deployment work are still in progress.
 
-## Development Progress
+## Architecture
 
-```text
-███████████░░░░░░░░░ 55%
+```mermaid
+flowchart LR
+    Client[Client] --> Gateway[API Gateway :8080]
+    Gateway --> Account[Account Service :8081]
+    Gateway --> Transaction[Transaction Service :8082]
+    Gateway --> Payment[Payment Service :8083]
+
+    Transaction -->|OpenFeign| Account
+    Fraud[Fraud Detection :8084] -->|OpenFeign| Account
+
+    Transaction <--> Kafka[(Apache Kafka)]
+    Fraud <--> Kafka
+    Account <--> Kafka
+    Payment --> Kafka
+    Kafka --> Notification[Notification Service :8085]
+
+    Gateway --> Redis[(Redis)]
+    Transaction --> Redis
+    Fraud --> Redis
+    Account --> MySQL[(MySQL)]
+    Transaction --> MySQL
+    Payment --> MySQL
 ```
 
-| Module | Current Status |
-| --- | --- |
-| Account Service | In progress: includes account creation, account lookup, balance deduction, crediting, and account blocking endpoints |
-| Transaction Service | In progress: includes transfers, transaction lookup, transaction history, and the foundation of Saga event handling |
-| Fraud Detection Service | In progress: transaction risk checks and Kafka fraud events are being implemented |
-| Payment Service | In progress: payment request, response, entity, and status models have been created |
-| Notification Service | In progress: an OTP Kafka consumer has been started, but notification delivery is not implemented yet |
-| API Gateway | Planned: the basic Spring Cloud Gateway structure has been created |
+## Microservices
+
+| Service | Port | Responsibility | Status |
+| --- | ---: | --- | --- |
+| API Gateway | `8080` | Routes account, transaction, and payment APIs; applies Redis-backed IP rate limiting | Implemented |
+| Account Service | `8081` | Creates accounts, returns balances, credits and deducts funds, and blocks accounts | Implemented |
+| Transaction Service | `8082` | Starts transfers, stores transaction history, verifies OTPs, completes transfers, and executes compensation refunds | Implemented, being refined |
+| Payment Service | `8083` | Creates Razorpay orders, stores payment records, accepts webhooks, and publishes payment events | In progress |
+| Fraud Detection Service | `8084` | Evaluates transaction risk using account data and Redis-backed activity checks | Implemented, being refined |
+| Notification Service | `8085` | Consumes OTP, transaction, fraud, refund, and payment events | Event consumers implemented; delivery channel in progress |
+
+## Main Features
+
+- Account creation, lookup, balance management, and account blocking
+- Bank transfers with persisted transaction status and history
+- OpenFeign communication between transaction, fraud, and account services
+- Kafka-based fraud screening and asynchronous service coordination
+- Redis-backed OTP storage with a five-minute expiry
+- Saga compensation that refunds the sender when verification fails or expires
+- Razorpay order, webhook, payment persistence, and Kafka event foundations
+- API Gateway routing with separate rate limits for banking and payment APIs
+- Local MySQL, Redis, Kafka, and ZooKeeper infrastructure through Docker Compose
+- Spring Boot Actuator health and information endpoints
+
+## Transfer Workflow
+
+1. The Transaction Service deducts the sender's balance, stores the transfer as `PROCESSING`, and publishes `transaction.initiated`.
+2. The Fraud Detection Service evaluates the transfer and publishes either `fraud.check.clean` or `verification.required`.
+3. A clean result completes the transfer and publishes `transaction.completed` so the receiver can be credited.
+4. A suspicious transfer moves to `PENDING_VERIFICATION`; its OTP is stored temporarily in Redis and announced through `transaction.otp.generated`.
+5. A correct OTP completes the transfer. An expired or incorrect OTP triggers compensation through `transaction.refunded`; an incorrect OTP also publishes `fraud.detected` so the account can be blocked.
+6. The Notification Service consumes the resulting events and currently records notification content through application logs.
+
+### Kafka Topics
+
+| Topic | Producer | Main Consumer | Purpose |
+| --- | --- | --- | --- |
+| `transaction.initiated` | Transaction Service | Fraud Detection Service | Starts transaction risk evaluation |
+| `fraud.check.clean` | Fraud Detection Service | Transaction Service | Completes a transfer that passed screening |
+| `verification.required` | Fraud Detection Service | Transaction Service | Starts OTP verification for a suspicious transfer |
+| `transaction.otp.generated` | Transaction Service | Notification Service | Passes OTP notification data |
+| `transaction.completed` | Transaction Service | Account and Notification Services | Credits the receiver and records debit/credit alerts |
+| `transaction.refunded` | Transaction Service | Notification Service | Announces Saga compensation and sender refund |
+| `fraud.detected` | Transaction Service | Account and Notification Services | Blocks the affected account and records an alert |
+| `payment.completed` | Payment Service | Notification Service | Announces a successful payment |
+| `payment.failed` | Payment Service | Notification Service | Announces a failed payment |
+
+## API Overview
+
+All public banking requests are intended to enter through the API Gateway at `http://localhost:8080`.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/v1/accounts` | Create an account |
+| `GET` | `/api/v1/accounts/{accountNumber}` | Get account details |
+| `GET` | `/api/v1/accounts/{accountNumber}/balance` | Get an account balance |
+| `PUT` | `/api/v1/accounts/{accountNumber}/deduct` | Deduct funds |
+| `PUT` | `/api/v1/accounts/{accountNumber}/credit` | Credit funds |
+| `PUT` | `/api/v1/accounts/{accountNumber}/block` | Block an account |
+| `POST` | `/api/v1/transactions/transfer` | Start a transfer |
+| `GET` | `/api/v1/transactions/{transactionId}` | Get a transaction |
+| `GET` | `/api/v1/transactions/account/{accountNumber}` | Get transaction history |
+| `POST` | `/api/v1/transactions/{transactionId}/verify` | Verify a transfer OTP |
+| `POST` | `/api/v1/payments/create-order` | Create a Razorpay payment order |
+| `POST` | `/api/v1/payments/webhook` | Receive a Razorpay webhook |
 
 ## Technology Stack
 
 - Java 17
-- Spring Boot
-- Spring Cloud Gateway / OpenFeign
-- Spring Data JPA
+- Spring Boot 4.1
+- Spring Cloud Gateway and OpenFeign
+- Spring Data JPA and Hibernate
 - Apache Kafka
-- MySQL
 - Redis
-- Maven
+- MySQL 8
+- Razorpay Java SDK
+- Maven and Maven Wrapper
 - Docker Compose
 - Lombok
 
@@ -36,69 +114,69 @@ A Java and Spring Boot-based digital banking backend built with a microservices 
 
 ```text
 digital-banking-system/
-├── account-service/          # Bank account and balance management
-├── transaction-service/      # Transfers and transaction history
-├── fraud-detection-service/  # Transaction risk and fraud detection
-├── payment-service/          # Payment processing
-├── notification-service/     # Email and event notifications
-├── api-gateway/              # Unified API entry point
-└── docker-compose.yml        # MySQL, Redis, Kafka, and Zookeeper
+├── api-gateway/              # Routing and Redis-backed rate limiting
+├── account-service/          # Account and balance management
+├── transaction-service/      # Transfers, OTP verification, and Saga coordination
+├── fraud-detection-service/  # Transaction risk evaluation
+├── payment-service/          # Razorpay payment workflow
+├── notification-service/     # Kafka-based notification consumers
+└── docker-compose.yml        # MySQL, Redis, Kafka, and ZooKeeper
 ```
 
-## Currently Implemented
+## Local Development
 
-- Account creation, balance lookup, balance deduction, crediting, and account blocking
-- Transfer creation and transaction status persistence
-- OpenFeign communication between Account Service and Transaction Service
-- Foundation for Kafka-based transaction, completion, and fraud detection events
-- MySQL data persistence configuration
-- Docker Compose development environment for Redis, Kafka, Zookeeper, and MySQL
+### Prerequisites
 
-## How Kafka Is Used
+- Java 17
+- Docker Desktop with Docker Compose
+- Razorpay test credentials for Payment Service development
 
-Apache Kafka is used as the event broker between the microservices. It allows each service to react to transaction events asynchronously without being tightly coupled to the other services. Kafka also supports the event-driven Saga flow used to coordinate transfers, fraud checks, account updates, and notifications.
+### 1. Start infrastructure
 
-The current transaction flow is:
-
-1. **Transaction Service** creates a transfer with the `PROCESSING` status and publishes a `transaction.initiated` event.
-2. **Fraud Detection Service** consumes `transaction.initiated`, checks the transaction, and publishes either `verification.required` or `fraud.check.clean`.
-3. **Transaction Service** consumes `verification.required`, generates an OTP, stores it temporarily in Redis, and changes the transaction status to `PENDING_VERIFICATION`.
-4. **Account Service** is prepared to consume `transaction.completed` to credit the receiver's account.
-5. **Account Service** also consumes `fraud.detected` to block an account flagged for fraudulent activity.
-
-| Kafka Topic | Producer | Consumer | Purpose |
-| --- | --- | --- | --- |
-| `transaction.initiated` | Transaction Service | Fraud Detection Service | Starts the fraud-checking process for a new transfer |
-| `verification.required` | Fraud Detection Service | Transaction Service | Requests OTP verification for a suspicious transfer |
-| `transaction.otp.generated` | Transaction Service (in progress) | Notification Service | Delivers generated OTP event data to the notification workflow |
-| `fraud.check.clean` | Fraud Detection Service | Transaction Service (in progress) | Reports that a transfer passed the fraud checks |
-| `transaction.completed` | Transaction Service (in progress) | Account Service | Credits the receiver after a successful transfer |
-| `fraud.detected` | Fraud workflow (in progress) | Account Service | Blocks an account associated with confirmed fraud |
-| `transaction.refunded` | Transaction Service (planned) | Relevant services (planned) | Supports compensation when a transfer fails |
-
-## Roadmap
-
-- Complete the fraud detection rules and suspicious transaction verification flow
-- Complete Saga compensation and failed-transfer refund handling
-- Implement the Payment Service business logic
-- Implement email and transaction notifications
-- Configure and connect API Gateway routes
-- Add authentication, authorization, and API security
-- Add unit tests, integration tests, and API documentation
-- Complete the containerized deployment configuration
-
-## Starting the Infrastructure
-
-Install Docker, then run the following command from the project root:
+From the repository root:
 
 ```bash
 docker compose up -d
+docker compose ps
 ```
 
-Each microservice can be started from its own directory with the Maven Wrapper:
+The Compose stack publishes MySQL on host port `3307`, Redis on `6379`, and Kafka on `9092`.
+
+### 2. Configure Payment Service
+
+Set Razorpay credentials in your shell before starting the Payment Service:
 
 ```bash
-./mvnw spring-boot:run
+export RAZORPAY_KEY_ID="your_test_key_id"
+export RAZORPAY_KEY_SECRET="your_test_key_secret"
 ```
 
-Before starting the services, verify the MySQL, Kafka, and Redis connection settings for your local environment.
+Do not commit real credentials to the repository.
+
+### 3. Start the services
+
+Open a separate terminal for each service and run:
+
+```bash
+cd account-service && ./mvnw spring-boot:run
+cd transaction-service && ./mvnw spring-boot:run
+cd fraud-detection-service && ./mvnw spring-boot:run
+cd payment-service && ./mvnw spring-boot:run
+cd notification-service && ./mvnw spring-boot:run
+cd api-gateway && ./mvnw spring-boot:run
+```
+
+Health endpoints are available at `http://localhost:<service-port>/actuator/health` for services with Actuator configured.
+
+## Roadmap
+
+- Validate Razorpay webhook signatures and complete payment failure handling
+- Connect the Notification Service to a real email or messaging provider
+- Add authentication, authorization, and API security
+- Add centralized exception handling, service discovery, and distributed tracing
+- Expand unit, integration, and end-to-end test coverage
+- Add container images and production deployment configuration
+
+## Disclaimer
+
+This repository is an educational backend project under active development. It is not production-ready and must not be used to process real banking data or real payments without a full security, compliance, reliability, and operational review.

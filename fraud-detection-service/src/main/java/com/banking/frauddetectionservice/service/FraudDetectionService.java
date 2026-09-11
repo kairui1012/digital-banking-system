@@ -27,7 +27,7 @@ public class FraudDetectionService {
     private final KafkaTemplate<String,Object> kafkaTemplate;
     private final RedisTemplate<String,String> redisTemplate;
 
-    @Value("${fraud.max-transaction-per-minute}")
+    @Value("${fraud.max-transactions-per-minute}")
     private int maxTransactionsPerMinute;
 
     @Value("${fraud.suspicious-amount-multiplier}")
@@ -144,5 +144,4 @@ public class FraudDetectionService {
         return amount.compareTo(maxAllowed) > 0;
     }
 }
-
 
