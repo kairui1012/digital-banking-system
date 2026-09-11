@@ -2,34 +2,6 @@
 
 Digital Banking System is a Java 17 and Spring Boot microservices backend for account management, bank transfers, fraud screening, payment processing, and event-driven notifications. It combines synchronous REST communication with Apache Kafka events and uses a Saga-style workflow to coordinate transfers across independently deployable services.
 
-> **Project status:** Under active development — approximately **65% complete**. Core account and transfer flows are implemented, while payment hardening, notification delivery, security, automated testing, and deployment work are still in progress.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    Client[Client] --> Gateway[API Gateway :8080]
-    Gateway --> Account[Account Service :8081]
-    Gateway --> Transaction[Transaction Service :8082]
-    Gateway --> Payment[Payment Service :8083]
-
-    Transaction -->|OpenFeign| Account
-    Fraud[Fraud Detection :8084] -->|OpenFeign| Account
-
-    Transaction <--> Kafka[(Apache Kafka)]
-    Fraud <--> Kafka
-    Account <--> Kafka
-    Payment --> Kafka
-    Kafka --> Notification[Notification Service :8085]
-
-    Gateway --> Redis[(Redis)]
-    Transaction --> Redis
-    Fraud --> Redis
-    Account --> MySQL[(MySQL)]
-    Transaction --> MySQL
-    Payment --> MySQL
-```
-
 ## Microservices
 
 | Service | Port | Responsibility | Status |
@@ -168,15 +140,3 @@ cd api-gateway && ./mvnw spring-boot:run
 
 Health endpoints are available at `http://localhost:<service-port>/actuator/health` for services with Actuator configured.
 
-## Roadmap
-
-- Validate Razorpay webhook signatures and complete payment failure handling
-- Connect the Notification Service to a real email or messaging provider
-- Add authentication, authorization, and API security
-- Add centralized exception handling, service discovery, and distributed tracing
-- Expand unit, integration, and end-to-end test coverage
-- Add container images and production deployment configuration
-
-## Disclaimer
-
-This repository is an educational backend project under active development. It is not production-ready and must not be used to process real banking data or real payments without a full security, compliance, reliability, and operational review.
